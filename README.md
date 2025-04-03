@@ -19,6 +19,56 @@ python tools/pipeline.py
 sh tools/pipeline.sh
 ```
 
+# Instructions for Forked version (tailored for me)
+```
+# Create the necessary directories
+mkdir -p datasets/mcad/raw
+mkdir -p datasets/mcad/features
+mkdir -p datasets/mcad/aux_stocks_files
+
+# Create stocks.txt with your assets (uppercase)
+echo -e "SPY\nQQQ\nGLD\nSHY\nTLT\nIEF\nDBC" > datasets/mcad/stocks.txt
+
+# run preprocess just as given in the EarnMore codebase
+python tools/preprocess.py
+
+# Create a run script for multi-asset-class dataset
+# mcad = Multi-Class Asset Dataset
+cat > tools/pipeline_{algorithm}_mcad.sh << 'EOF'
+python tools/make_scripts.py \
+ --config configs/mask_sac_portfolio_management.py \
+ --mask \
+ --action_wrapper_method softmax \
+ --num_episodes 2000 \
+ --dataset mcad \
+ --num_stocks 7 \
+ --buffer_size 10000 \
+ --repeat_times 128 \
+ --gpu_id 0 \
+ --days 10 \
+ --lr 1e-5 \
+ --act_lr 1e-5 \
+ --cri_lr 1e-5 \
+ --rep_lr 1e-5 \
+ --beta_lr 1e-5 \
+ --seed 42 \
+ --T 0.1
+EOF
+
+chmod +x tools/pipeline_{algorithm}_mcad.sh
+
+# Add export functionality to train.py
+sed -i '1s/^/from pm.utils.export import export_allocation_history\n/' tools/train.py
+sed -i '/def parse_args/a \    parser.add_argument("--export_allocations", action="store_true", help="Export allocation history")' tools/train.py
+sed -i '/return agent, train_env, val_env, test_env/i \    if args.export_allocations:\n        export_path = os.path.join(cfg.workdir, cfg.tag, "allocation_history.csv")\n        export_allocation_history(agent, test_env, export_path)' tools/train.py
+
+# Generate the training script
+sh tools/pipeline_{algorithm}_mcad.sh
+
+# Run the generated script with allocation export
+CUDA_VISIBLE_DEVICES=0 python tools/train.py --config configs/ppo/ppo_portfolio_management.py --export_allocations
+```
+
 # References
 
 ElegantRL: https://github.com/AI4Finance-Foundation/ElegantRL
