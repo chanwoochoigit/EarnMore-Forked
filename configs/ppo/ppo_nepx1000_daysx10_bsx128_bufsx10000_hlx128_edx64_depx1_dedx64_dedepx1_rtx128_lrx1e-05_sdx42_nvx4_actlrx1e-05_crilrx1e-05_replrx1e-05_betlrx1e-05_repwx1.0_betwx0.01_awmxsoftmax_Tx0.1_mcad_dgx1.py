@@ -1,13 +1,11 @@
 root = None
 workdir = "workdir"
-tag = "ddpg_nepx2_daysx10_bsx128_bufsx10000_hlx128_edx64_depx1_dedx64_dedepx1_rtx128_lrx1e-05_sdx42_nvx4_actlrx1e-05_crilrx1e-05_replrx1e-05_betlrx1e-05_repwx1.0_betwx0.01_awmxsoftmax_Tx0.1_mcad_dgx1"
+tag = "ppo_nepx1000_daysx10_bsx128_bufsx10000_hlx128_edx64_depx1_dedx64_dedepx1_rtx128_lrx1e-05_sdx42_nvx4_actlrx1e-05_crilrx1e-05_replrx1e-05_betlrx1e-05_repwx1.0_betwx0.01_awmxsoftmax_Tx0.1_mcad_dgx1"
 num_stocks = 7
 num_envs = 4
-discretized_low = 0
-discretized_high = 10
 num_features = 102
 temporal_dim = 3
-train_start_date = "2007-01-23"
+train_start_date = "2007-02-06"
 val_start_date = "2019-09-25"
 test_start_date = "2022-06-08"
 test_end_date = "2025-02-28"
@@ -18,7 +16,10 @@ save_freq = 20
 n_steps_per_episode = 1280
 repeat_times = 128
 action_wrapper_method = "softmax"
-num_episodes = 2
+ratio_clip = 0.25
+lambda_gae_adv = 0.95
+lambda_entropy = 0.01
+num_episodes = 1000
 days = 10
 batch_size = 128
 buffer_size = 10000
@@ -26,15 +27,14 @@ horizon_len = 128
 embed_dim = 64
 depth = 1
 lr = 1e-05
-explore_noise_std = 0.1
-policy_noise_std = 0.1
 seed = 42
 feature_size = (10, 102)
 patch_size = (10, 102)
-transition = ["state", "action", "reward", "done", "next_state"]
+transition = ["state", "action", "logprob", "reward", "done", "next_state"]
 transition_shape = dict(
     state=dict(shape=(4, 7, 10, 102), type="float32"),
     action=dict(shape=(4, 8), type="float32"),
+    logprob=dict(shape=(4,), type="float32"),
     mask=dict(shape=(4, 7), type="int32"),
     ids_restore=dict(shape=(4, 7), type="int64"),
     reward=dict(shape=(4,), type="float32"),
@@ -165,7 +165,7 @@ environment = dict(
     transaction_cost_pct=0.001,
 )
 act_net = dict(
-    type="ActorDDPG",
+    type="ActorPPO",
     embed_type="TimesEmbed",
     feature_size=(10, 102),
     t_patch_size=1,
@@ -176,12 +176,9 @@ act_net = dict(
     embed_dim=64,
     depth=1,
     cls_embed=True,
-    explore_noise_std=0.1,
-    discretized_low=0,
-    discretized_high=10,
 )
 cri_net = dict(
-    type="CriticDDPG",
+    type="CriticPPO",
     embed_type="TimesEmbed",
     feature_size=(10, 102),
     t_patch_size=1,
@@ -192,21 +189,19 @@ cri_net = dict(
     embed_dim=64,
     depth=1,
     cls_embed=True,
-    discretized_low=0,
-    discretized_high=10,
 )
-criterion = dict(type="SmoothL1Loss", reduction="none")
+criterion = dict(type="MSELoss", reduction="none")
 scheduler = dict(
     type="MultiStepLRScheduler",
-    multi_steps=[614400, 1024000, 1433600],
+    multi_steps=[768000, 1280000, 1792000],
     t_initial=1024000,
     decay_t=512000,
     gamma=0.1,
     t_mul=1.0,
     lr_min=0.0,
     decay_rate=1.0,
-    warmup_t=102400,
-    warmup_lr_init=0,
+    warmup_t=384000,
+    warmup_lr_init=1e-08,
     warmup_prefix=False,
     cycle_limit=0,
     t_in_epochs=False,
@@ -218,11 +213,11 @@ scheduler = dict(
 )
 optimizer = dict(type="AdamW", params=None, lr=1e-05)
 agent = dict(
-    type="AgentDDPG",
+    type="AgentPPO",
     act_lr=1e-05,
     cri_lr=1e-05,
     act_net=dict(
-        type="ActorDDPG",
+        type="ActorPPO",
         embed_type="TimesEmbed",
         feature_size=(10, 102),
         t_patch_size=1,
@@ -233,12 +228,9 @@ agent = dict(
         embed_dim=64,
         depth=1,
         cls_embed=True,
-        explore_noise_std=0.1,
-        discretized_low=0,
-        discretized_high=10,
     ),
     cri_net=dict(
-        type="CriticDDPG",
+        type="CriticPPO",
         embed_type="TimesEmbed",
         feature_size=(10, 102),
         t_patch_size=1,
@@ -249,10 +241,8 @@ agent = dict(
         embed_dim=64,
         depth=1,
         cls_embed=True,
-        discretized_low=0,
-        discretized_high=10,
     ),
-    criterion=dict(type="SmoothL1Loss", reduction="none"),
+    criterion=dict(type="MSELoss", reduction="none"),
     optimizer=dict(type="AdamW", params=None, lr=1e-05),
     scheduler=dict(
         type="MultiStepLRScheduler",
@@ -263,8 +253,8 @@ agent = dict(
         t_mul=1.0,
         lr_min=0.0,
         decay_rate=1.0,
-        warmup_t=102400,
-        warmup_lr_init=0,
+        warmup_t=307200,
+        warmup_lr_init=1e-08,
         warmup_prefix=False,
         cycle_limit=0,
         t_in_epochs=False,
@@ -279,6 +269,7 @@ agent = dict(
     transition_shape=dict(
         state=dict(shape=(4, 7, 10, 102), type="float32"),
         action=dict(shape=(4, 8), type="float32"),
+        logprob=dict(shape=(4,), type="float32"),
         mask=dict(shape=(4, 7), type="int32"),
         ids_restore=dict(shape=(4, 7), type="int64"),
         reward=dict(shape=(4,), type="float32"),
@@ -293,10 +284,9 @@ agent = dict(
     clip_grad_norm=3.0,
     soft_update_tau=0.005,
     state_value_tau=0,
-    explore_noise_std=0.1,
-    policy_noise_std=0.1,
-    discretized_low=0,
-    discretized_high=10,
+    ratio_clip=0.25,
+    lambda_gae_adv=0.95,
+    lambda_entropy=0.01,
     device=None,
     action_wrapper_method="softmax",
 )

@@ -2,7 +2,7 @@ python tools/make_scripts.py \
  --config configs/ddpg_portfolio_management.py \
  --mask \
  --action_wrapper_method softmax \
- --num_episodes 2 \
+ --num_episodes 500 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \

@@ -185,21 +185,21 @@ def main():
     """
 
     if args.data_group == "0":
-        train_start_date = "2007-01-23"
+        train_start_date = "2007-02-06"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"
         n_steps_per_episode = 1024
 
     elif args.data_group == "1":
-        train_start_date = "2007-01-23"
+        train_start_date = "2007-02-06"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"
         n_steps_per_episode = 1280
 
     elif args.data_group == "2":
-        train_start_date = "2007-01-23"
+        train_start_date = "2007-02-06"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"

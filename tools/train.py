@@ -372,11 +372,15 @@ def validate(environment, agent):
         "episode_stats": {},
     }
     logging_tuple = agent.validate_net(environment)
+    if len(logging_tuple) == 2:
+        stats_dict, _ = logging_tuple
+    else:
+        stats_dict = logging_tuple
 
     # added on Apr 3, 2025 as agent.validate_net does not return infos
     infos = {"deprecated": True}
     # update episode stats
-    for k, v in logging_tuple.items():
+    for k, v in stats_dict.items():
         stats["episode_stats"][k] = v
 
     return stats, infos

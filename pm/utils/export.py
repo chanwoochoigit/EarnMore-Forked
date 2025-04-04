@@ -2,15 +2,11 @@ import os
 import pandas as pd
 import numpy as np
 import torch
-import torch.nn.functional as F
+from einops import rearrange
 
 
 def export_allocation_history(agent, env, output_path="allocation_history.csv"):
-    """
-    This util function is to export the allocation history
-    to a CSV, which will be further analyzed and integrated
-    into the codebase for comparison and reporting
-    """
+    """Export allocation history to a CSV file"""
     print(f"Exporting allocation history to {output_path}...")
 
     # Reset the environment
@@ -21,47 +17,43 @@ def export_allocation_history(agent, env, output_path="allocation_history.csv"):
     dates = []
     allocations = []
 
-    # Get allocations for each step
+    # Check if this is a masked model with a representation network
+    agent_type = type(agent).__name__
+    is_masked = "mask" in agent_type.lower() and hasattr(agent, "rep")
+
+    # Process each step
     while not done:
         # Get current date
         date = (
-            env.get_current_date() if hasattr(env, "get_current_date") else len(dates)
+            env.current_date
+            if hasattr(env, "current_date")
+            else (
+                env.get_current_date()
+                if hasattr(env, "get_current_date")
+                else len(dates)
+            )
         )
         dates.append(date)
+        # Convert state to tensor
+        state_tensor = torch.tensor(state, dtype=torch.float32, device=agent.device)
 
-        # Reshape state to match agent's expected input format
-        # Add batch and channel dimensions: (N, D, F) -> (1, 1, N, D, F)
-        if isinstance(state, np.ndarray):
-            state_tensor = (
-                torch.tensor(state, dtype=torch.float32, device=agent.device)
-                .unsqueeze(0)
-                .unsqueeze(0)
-            )  # Add batch and channel dims
-        else:
-            # If it's already a tensor, just add dimensions
-            state_tensor = state.unsqueeze(0).unsqueeze(0)
-
-        # Get action from agent
-        with torch.no_grad():  # Ensure we're in evaluation mode
-            action = agent.act(state_tensor)
-
-            # Apply softmax to normalize allocations if needed
-            if isinstance(action, torch.Tensor):
-                if not torch.isclose(
-                    action.sum(), torch.tensor(1.0, device=action.device)
-                ):
-                    action = F.softmax(action, dim=-1)
-                action_np = action.detach().cpu().numpy()
+        # Get action based on model type
+        with torch.no_grad():
+            if is_masked:
+                # For masked models, use the representation network 3-d to 5-d
+                state_tensor = state_tensor.unsqueeze(0).unsqueeze(0)  # (B, E, N, D, F)
+                # Reshape for the representation network
+                reshaped_state = rearrange(state_tensor, "b e n d f -> (b e) n d f")
+                # Get masked representation
+                rep_state, _, _ = agent.rep.forward_state(reshaped_state)
+                # Get action using representation
+                action = agent.act(rep_state)
             else:
-                # If it's already numpy, apply softmax using numpy if needed
-                if not np.isclose(np.sum(action), 1.0):
-                    action_np = np.exp(action) / np.sum(
-                        np.exp(action), axis=-1, keepdims=True
-                    )
-                else:
-                    action_np = action
+                # For non-masked models, use the state directly
+                action = agent.act(state_tensor)
 
-        # Record allocation
+        # Convert to numpy and store
+        action_np = action.detach().cpu().numpy()
         allocations.append(action_np.flatten())
 
         # Step environment
