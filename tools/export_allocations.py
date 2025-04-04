@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import torch
 from mmengine.config import Config
-from copy import deepcopy
+import pandas as pd
 
 ROOT = str(Path(__file__).resolve().parents[1])
 sys.path.append(ROOT)
@@ -42,81 +42,84 @@ def main():
     )
     output_dir = args.output_dir if args.output_dir else exp_path
 
-    # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Build dataset
     print("Building dataset...")
     dataset = DATASET.build(cfg.dataset)
 
-    # Build environments
     print("Building environments...")
-
-    # Train environment
+    # create a training environment just to get the scaler
     cfg.environment.update(
         dict(
-            mode="train",
+            mode="train",  # Must be in train mode to create the scaler
             if_norm=True,
             dataset=dataset,
             start_date=cfg.train_start_date,
             end_date=cfg.val_start_date,
         )
     )
-    train_environment = ENVIRONMENT.build(cfg.environment)
+    scaler_env = ENVIRONMENT.build(cfg.environment)
+    scaler = scaler_env.scaler
 
-    # Validation environment
+    # Now create backtesting environment in val mode with fixed starting points
     cfg.environment.update(
         dict(
-            mode="val",
+            mode="val",  # Val mode for deterministic behavior
             if_norm=True,
             dataset=dataset,
-            scaler=train_environment.scaler,
-            start_date=cfg.val_start_date,
-            end_date=cfg.test_start_date,
+            scaler=scaler,  # Use scaler from first environment
+            start_date=cfg.train_start_date,
+            end_date=None,
         )
     )
-    val_environment = ENVIRONMENT.build(cfg.environment)
+    backtest_environment = ENVIRONMENT.build(cfg.environment)
 
-    # Test environment
-    cfg.environment.update(
-        dict(
-            mode="test",
-            if_norm=True,
-            dataset=dataset,
-            scaler=train_environment.scaler,
-            start_date=cfg.test_start_date,
-            end_date=getattr(cfg, "test_end_date", None),
-        )
-    )
-    test_environment = ENVIRONMENT.build(cfg.environment)
+    # Manually set day to start at the beginning of the dataset
+    backtest_environment.day = backtest_environment.days - 1  # Start at beginning
 
-    # Build agent
     print("Building agent...")
     cfg.agent.update(dict(device=device))
     agent = AGENT.build(cfg.agent)
 
-    # Load checkpoint
     print(f"Loading checkpoint from {checkpoint_path}...")
     episode = load_checkpoint(agent, checkpoint_path)
     print(f"Loaded checkpoint from episode {episode}")
 
+    # Set agent to evaluation mode if it has that method
+    if hasattr(agent, "eval"):
+        agent.eval()
+
     # Export allocation histories
     print("Exporting allocation histories...")
 
-    # Train set
-    train_output_path = os.path.join(output_dir, "train_allocation_history.csv")
-    print(f"Exporting training allocation history to {train_output_path}...")
-    export_allocation_history(agent, train_environment, train_output_path)
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Validation set
-    val_output_path = os.path.join(output_dir, "val_allocation_history.csv")
-    print(f"Exporting validation allocation history to {val_output_path}...")
-    export_allocation_history(agent, val_environment, val_output_path)
+    output_path = os.path.join(output_dir, "allocation_history.csv")
+    alloc_h_df = export_allocation_history(agent, backtest_environment, output_path)
 
-    # Test set
-    test_output_path = os.path.join(output_dir, "test_allocation_history.csv")
-    print(f"Exporting test allocation history to {test_output_path}...")
-    export_allocation_history(agent, test_environment, test_output_path)
+    alloc_h_df = alloc_h_df.sort_values(by="date")
+    stock_names = ["cash"] + backtest_environment.stocks  # assign assets
+
+    # Rename the columns to match stock names
+    # Column 0 is the date, columns 1+ are allocations
+    column_names = ["date"] + stock_names
+
+    # Verify we have the right number of columns
+    if len(column_names) == alloc_h_df.shape[1]:
+        alloc_h_df.columns = column_names
+    else:
+        print(
+            f"Warning: Column count mismatch - found {alloc_h_df.shape[1]} columns but expected {len(column_names)}"
+        )
+        # Rename only what we can and leave the rest
+        alloc_h_df.columns = ["date"] + [
+            f"allocation_{i}" for i in range(alloc_h_df.shape[1] - 1)
+        ]
+
+    # Save the combined history
+    alloc_h_df.to_csv(output_path, index=False)
+    print(f"Allocation history saved to {output_path}")
 
     print("All allocation histories exported successfully")
 

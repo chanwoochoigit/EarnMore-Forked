@@ -246,8 +246,8 @@ def main(inpath, outpath):
         cal_target(df)
 
         df = df.iloc[60:-1].reset_index()
-        df = df[df["Date"] >= "2007-02-06"]
-        df = df[df["Date"] <= "2025-02-28"]
+        df = df[df["Date"] >= "2007-01-23"]
+        df = df[df["Date"] <= "2025-03-01"]
         df = df.reset_index(drop=True)
 
         # # nan value check

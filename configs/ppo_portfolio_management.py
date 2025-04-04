@@ -7,7 +7,7 @@ num_envs = 4
 num_features = 102  # num features name + num temporals name
 temporal_dim = 3  # weekday, day, month
 
-train_start_date = "2007-02-06"
+train_start_date = "2007-01-23"
 val_start_date = "2019-09-25"
 test_start_date = "2022-06-08"
 test_end_date = "2025-02-28"

@@ -185,21 +185,21 @@ def main():
     """
 
     if args.data_group == "0":
-        train_start_date = "2007-02-06"
+        train_start_date = "2007-01-23"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"
         n_steps_per_episode = 1024
 
     elif args.data_group == "1":
-        train_start_date = "2007-02-06"
+        train_start_date = "2007-01-23"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"
         n_steps_per_episode = 1280
 
     elif args.data_group == "2":
-        train_start_date = "2007-02-06"
+        train_start_date = "2007-01-23"
         val_start_date = "2019-09-25"
         test_start_date = "2022-06-08"
         test_end_date = "2025-02-28"
@@ -338,7 +338,7 @@ def main():
     cfg.tag = tag
     cfg.dump(os.path.join(save_config_path, "{}.py".format(tag)))
 
-    cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py --export_allocations"""
+    cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py"""
     print(cmd)
     os.makedirs(os.path.join(ROOT, "scripts", tag_name), exist_ok=True)
     with open(os.path.join(ROOT, "scripts", tag_name, "{}.sh".format(tag)), "w") as op:

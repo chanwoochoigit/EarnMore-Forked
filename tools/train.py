@@ -1,4 +1,3 @@
-from pm.utils.export import export_allocation_history
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -73,11 +72,6 @@ def parse_args():
     parser.add_argument("--workdir", type=str, default="workdir")
     parser.add_argument("--tag", type=str, default=None)
     parser.add_argument("--if_remove", action="store_true", default=True)
-    parser.add_argument(
-        "--export_allocations",
-        action="store_true",
-        help="Export allocation history after training",
-    )
     args = parser.parse_args()
     return args
 
@@ -321,25 +315,14 @@ def main():
 
     max_episode = load_checkpoint(agent, os.path.join(exp_path, "best.pth"))
     print("Test Max Episode: [{}/{}]".format(max_episode, cfg.num_episodes))
-    # test_stats, _ = validate(test_envs, agent)
 
-    # episode_stats = test_stats["episode_stats"]
+    # Echo the export command for the user to run
+    export_cmd = f"python tools/export_allocations.py --config {args.config}"
 
-    # test_log_stats = OrderedDict(
-    #     {
-    #         "episode": [max_episode],
-    #         **{f"{k}": ["{:04f}".format(v)] for k, v in episode_stats.items()},
-    #     }
-    # )
-
-    # table = print_table(test_log_stats)
-    # print(table)
-
-    # with pathmgr.open(os.path.join(exp_path, "test_log.txt"), "a") as op:
-    #     op.write(json.dumps(test_log_stats) + "\n")
-
-    # plot metrics
-    # plot_metrics(exp_path)
+    print("\n" + "=" * 80)
+    print("Training complete! To export allocation history, run:")
+    print(export_cmd)
+    print("=" * 80 + "\n")
 
     return agent, train_envs, val_envs
 
