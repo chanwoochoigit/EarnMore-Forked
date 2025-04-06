@@ -338,7 +338,17 @@ def main():
     cfg.tag = tag
     cfg.dump(os.path.join(save_config_path, "{}.py".format(tag)))
 
-    cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py"""
+    # Original training command
+    train_cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py"""
+
+    # Add export command to run after training
+    export_cmd = (
+        f"""python tools/export_allocations.py --config configs/{tag_name}/{tag}.py"""
+    )
+
+    # Combine commands with && to run sequentially (second command runs only if first succeeds)
+    cmd = f"""{train_cmd} && {export_cmd}"""
+
     print(cmd)
     os.makedirs(os.path.join(ROOT, "scripts", tag_name), exist_ok=True)
     with open(os.path.join(ROOT, "scripts", tag_name, "{}.sh".format(tag)), "w") as op:

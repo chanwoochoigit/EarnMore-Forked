@@ -1,8 +1,8 @@
 python tools/make_scripts.py \
- --config configs/mask_sac_portfolio_management.py \
+ --config configs/mask_sync_dqn_portfolio_management.py \
  --mask \
  --action_wrapper_method softmax \
- --num_episodes 1000 \
+ --num_episodes 250 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \

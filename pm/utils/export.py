@@ -3,10 +3,28 @@ import pandas as pd
 import numpy as np
 import torch
 from einops import rearrange
+import torch.nn.functional as F
+
+
+def map_action_3d_to_5d(state_tensor):
+    # For masked models, use the representation network 3-d to 5-d
+    state_tensor = state_tensor.unsqueeze(0).unsqueeze(0)  # (B, E, N, D, F)
+
+    return state_tensor
+
+
+def mask_action(agent, state_tensor):
+    state_tensor = map_action_3d_to_5d(state_tensor)
+    # Reshape for the representation network
+    reshaped_state = rearrange(state_tensor, "b e n d f -> (b e) n d f")
+    # Get masked representation
+    rep_state, _, _ = agent.rep.forward_state(reshaped_state)
+    # Get action using representation
+    action = agent.act(rep_state)
+    return action
 
 
 def export_allocation_history(agent, env, output_path="allocation_history.csv"):
-    """Export allocation history to a CSV file"""
     print(f"Exporting allocation history to {output_path}...")
 
     # Reset the environment
@@ -40,17 +58,14 @@ def export_allocation_history(agent, env, output_path="allocation_history.csv"):
         # Get action based on model type
         with torch.no_grad():
             if is_masked:
-                # For masked models, use the representation network 3-d to 5-d
-                state_tensor = state_tensor.unsqueeze(0).unsqueeze(0)  # (B, E, N, D, F)
-                # Reshape for the representation network
-                reshaped_state = rearrange(state_tensor, "b e n d f -> (b e) n d f")
-                # Get masked representation
-                rep_state, _, _ = agent.rep.forward_state(reshaped_state)
-                # Get action using representation
-                action = agent.act(rep_state)
+                action = mask_action(agent, state_tensor)
             else:
-                # For non-masked models, use the state directly
-                action = agent.act(state_tensor)
+                # DQN and SAC require 5-d action space
+                if any([x in agent_type.lower() for x in ["dqn", "sac", "ppo"]]):
+                    action = agent.act(map_action_3d_to_5d(state_tensor))
+                else:
+                    action = agent.act(state_tensor)
+            action = F.softmax(action, dim=-1)
 
         # Convert to numpy and store
         action_np = action.detach().cpu().numpy()

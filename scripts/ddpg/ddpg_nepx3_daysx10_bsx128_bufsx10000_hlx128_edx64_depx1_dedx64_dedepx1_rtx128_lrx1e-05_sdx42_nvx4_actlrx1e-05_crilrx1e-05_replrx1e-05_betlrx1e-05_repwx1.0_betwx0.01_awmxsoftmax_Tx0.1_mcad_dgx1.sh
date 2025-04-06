@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0 python tools/train.py --config configs/ddpg/ddpg_nepx3_daysx10_bsx128_bufsx10000_hlx128_edx64_depx1_dedx64_dedepx1_rtx128_lrx1e-05_sdx42_nvx4_actlrx1e-05_crilrx1e-05_replrx1e-05_betlrx1e-05_repwx1.0_betwx0.01_awmxsoftmax_Tx0.1_mcad_dgx1.py

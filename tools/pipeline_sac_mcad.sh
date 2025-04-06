@@ -1,7 +1,7 @@
 python tools/make_scripts.py \
  --config configs/sac_portfolio_management.py \
  --action_wrapper_method softmax \
- --num_episodes 2 \
+ --num_episodes 200 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \

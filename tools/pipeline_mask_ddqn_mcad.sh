@@ -1,8 +1,8 @@
 python tools/make_scripts.py \
- --config configs/mask_sac_portfolio_management.py \
+ --config configs/mask_ddqn_portfolio_management.py \
  --mask \
  --action_wrapper_method softmax \
- --num_episodes 1000 \
+ --num_episodes 250 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \
@@ -15,5 +15,4 @@ python tools/make_scripts.py \
  --rep_lr 1e-5 \
  --beta_lr 1e-5 \
  --seed 42 \
- --T 0.1 \
- --data_group 0
+ --T 0.1

@@ -1,7 +1,7 @@
 python tools/make_scripts.py \
  --config configs/ppo_portfolio_management.py \
  --action_wrapper_method softmax \
- --num_episodes 300 \
+ --num_episodes 250 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \
