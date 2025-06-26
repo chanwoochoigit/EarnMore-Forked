@@ -1,4 +1,5 @@
 import warnings
+
 warnings.filterwarnings("ignore")
 import os
 import sys
@@ -8,6 +9,7 @@ from mmengine.config import Config, DictAction
 
 ROOT = str(Path(__file__).resolve().parents[1])
 sys.path.append(ROOT)
+
 
 def update_keys(cfg, name, rename):
     if isinstance(cfg, Config):
@@ -20,6 +22,7 @@ def update_keys(cfg, name, rename):
                 cfg[name] = rename
             elif isinstance(value, dict):
                 update_keys(value, name, rename)
+
 
 """
 # train parameters (adjust mainly)
@@ -35,14 +38,19 @@ decoder_depth = 1
 lr = 1e-3
 """
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='PM train script')
-    parser.add_argument("--config", default=os.path.join(ROOT, "configs", "dqn_portfolio_management.py"), help="config file path")
 
-    parser.add_argument("--gpu_id", type = int, default=0)
+def parse_args():
+    parser = argparse.ArgumentParser(description="PM train script")
+    parser.add_argument(
+        "--config",
+        default=os.path.join(ROOT, "configs", "dqn_portfolio_management.py"),
+        help="config file path",
+    )
+
+    parser.add_argument("--gpu_id", type=int, default=0)
     parser.add_argument("--mask", action="store_true", default=False)
 
-    #dataset
+    # dataset
     # parser.add_argument("--dataset", type=str, default="sg1")
     # parser.add_argument("--num_stocks", type=int, default=1)
 
@@ -76,14 +84,16 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--num_envs", type=int, default=4)
 
-    #date
-    parser.add_argument("--data_group", type=str, default="1") # data_group = 1,2,3
+    # date
+    parser.add_argument("--data_group", type=str, default="1")  # data_group = 1,2,3
 
     parser.add_argument("--action_wrapper_method", type=str, default="reweight")
     parser.add_argument("--T", type=float, default=1.0)
 
     args = parser.parse_args()
     return args
+
+
 def main():
     args = parse_args()
 
@@ -135,7 +145,7 @@ def main():
         "decoder_depth": "dedep",
         "repeat_times": "rt",
         "lr": "lr",
-        "seed":"sd",
+        "seed": "sd",
         "num_envs": "nv",
         "act_lr": "actlr",
         "cri_lr": "crilr",
@@ -163,31 +173,36 @@ def main():
     tag += f"_{args.dataset}"
 
     """
+    [deprecated]
     2018-01-26 2019-07-22
     2019-07-22 2021-01-08
     2021-01-08 2022-06-26
-
+    [current]
+    train_start_date = "2007-02-06"
+    val_start_date = "2019-10-25"
+    test_start_date = "2022-07-19"
+    test_end_date = "2025-04-14"
     """
 
     if args.data_group == "0":
-        train_start_date = "2007-09-26"
-        val_start_date = "2018-01-26"
-        test_start_date = "2019-07-22"
-        test_end_date = "2021-01-08"
+        train_start_date = "2007-02-06"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1024
 
     elif args.data_group == "1":
-        train_start_date = "2007-09-26"
-        val_start_date = "2019-07-22"
-        test_start_date = "2021-01-08"
-        test_end_date = "2022-06-26"
+        train_start_date = "2007-02-06"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1280
 
     elif args.data_group == "2":
-        train_start_date = "2007-09-26"
-        val_start_date = "2021-01-08"
-        test_start_date = "2022-06-26"
-        test_end_date = None
+        train_start_date = "2007-02-06"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1536
     else:
         raise ValueError("data_group must be 0, 1, 2")
@@ -200,17 +215,48 @@ def main():
     # update scheduler config
     if args.dataset == "dj30":
         if args.num_episodes == 1000:
-            cfg.scheduler["multi_steps"] = [600 * n_steps_per_episode, 1000 * n_steps_per_episode, 1400 * n_steps_per_episode]
+            cfg.scheduler["multi_steps"] = [
+                600 * n_steps_per_episode,
+                1000 * n_steps_per_episode,
+                1400 * n_steps_per_episode,
+            ]
             cfg.scheduler["warmup_t"] = 300 * n_steps_per_episode
         elif args.num_episodes == 2000:
-            cfg.scheduler["multi_steps"] = [300 * n_steps_per_episode, 500 * n_steps_per_episode, 700 * n_steps_per_episode]
+            cfg.scheduler["multi_steps"] = [
+                300 * n_steps_per_episode,
+                500 * n_steps_per_episode,
+                700 * n_steps_per_episode,
+            ]
             cfg.scheduler["warmup_t"] = 100 * n_steps_per_episode
     elif args.dataset == "sp500":
         if args.num_episodes == 1000:
-            cfg.scheduler["multi_steps"] = [600 * n_steps_per_episode, 1000 * n_steps_per_episode, 1400 * n_steps_per_episode]
+            cfg.scheduler["multi_steps"] = [
+                600 * n_steps_per_episode,
+                1000 * n_steps_per_episode,
+                1400 * n_steps_per_episode,
+            ]
             cfg.scheduler["warmup_t"] = 300 * n_steps_per_episode
         elif args.num_episodes == 2000:
-            cfg.scheduler["multi_steps"] = [300 * n_steps_per_episode, 500 * n_steps_per_episode, 700 * n_steps_per_episode]
+            cfg.scheduler["multi_steps"] = [
+                300 * n_steps_per_episode,
+                500 * n_steps_per_episode,
+                700 * n_steps_per_episode,
+            ]
+            cfg.scheduler["warmup_t"] = 100 * n_steps_per_episode
+    elif args.dataset == "mcad":
+        if args.num_episodes == 1000:
+            cfg.scheduler["multi_steps"] = [
+                600 * n_steps_per_episode,
+                1000 * n_steps_per_episode,
+                1400 * n_steps_per_episode,
+            ]
+            cfg.scheduler["warmup_t"] = 300 * n_steps_per_episode
+        elif args.num_episodes == 2000:
+            cfg.scheduler["multi_steps"] = [
+                300 * n_steps_per_episode,
+                500 * n_steps_per_episode,
+                700 * n_steps_per_episode,
+            ]
             cfg.scheduler["warmup_t"] = 100 * n_steps_per_episode
 
     tag += f"_dgx{args.data_group}"
@@ -218,44 +264,68 @@ def main():
     # update mask config
     if not args.mask:
         transition_shape = dict(
-            state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32"),
+            state=dict(
+                shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                type="float32",
+            ),
             action=dict(shape=(args.num_envs, args.num_stocks + 1), type="float32"),
             reward=dict(shape=(args.num_envs,), type="float32"),
             done=dict(shape=(args.num_envs,), type="float32"),
-            next_state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32")
+            next_state=dict(
+                shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                type="float32",
+            ),
         )
 
         if "ppo" in cfg.tag:
             transition_shape = dict(
-                state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32"),
+                state=dict(
+                    shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                    type="float32",
+                ),
                 action=dict(shape=(args.num_envs, args.num_stocks + 1), type="float32"),
                 logprob=dict(shape=(args.num_envs,), type="float32"),
                 reward=dict(shape=(args.num_envs,), type="float32"),
                 done=dict(shape=(args.num_envs,), type="float32"),
-                next_state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32")
+                next_state=dict(
+                    shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                    type="float32",
+                ),
             )
 
         update_keys(cfg, "transition_shape", transition_shape)
     else:
         transition_shape = dict(
-            state = dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32"),
-            action = dict(shape=(args.num_envs, args.num_stocks + 1), type="float32"),
-            mask = dict(shape=(args.num_envs, args.num_stocks), type="int32"),
-            ids_restore = dict(shape=(args.num_envs, args.num_stocks), type="int64"),
-            reward = dict(shape=(args.num_envs,), type="float32"),
-            done = dict(shape=(args.num_envs,), type="float32"),
-            next_state = dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32")
+            state=dict(
+                shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                type="float32",
+            ),
+            action=dict(shape=(args.num_envs, args.num_stocks + 1), type="float32"),
+            mask=dict(shape=(args.num_envs, args.num_stocks), type="int32"),
+            ids_restore=dict(shape=(args.num_envs, args.num_stocks), type="int64"),
+            reward=dict(shape=(args.num_envs,), type="float32"),
+            done=dict(shape=(args.num_envs,), type="float32"),
+            next_state=dict(
+                shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                type="float32",
+            ),
         )
         if "ppo" in cfg.tag:
             transition_shape = dict(
-                state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32"),
+                state=dict(
+                    shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                    type="float32",
+                ),
                 action=dict(shape=(args.num_envs, args.num_stocks + 1), type="float32"),
                 logprob=dict(shape=(args.num_envs,), type="float32"),
                 mask=dict(shape=(args.num_envs, args.num_stocks), type="int32"),
                 ids_restore=dict(shape=(args.num_envs, args.num_stocks), type="int64"),
                 reward=dict(shape=(args.num_envs,), type="float32"),
                 done=dict(shape=(args.num_envs,), type="float32"),
-                next_state=dict(shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features), type="float32")
+                next_state=dict(
+                    shape=(args.num_envs, args.num_stocks, cfg.days, cfg.num_features),
+                    type="float32",
+                ),
             )
 
         update_keys(cfg, "transition_shape", transition_shape)
@@ -265,16 +335,26 @@ def main():
     patch_size = (cfg.days, cfg.num_features)
     update_keys(cfg, "patch_size", patch_size)
 
-
     cfg.tag = tag
     cfg.dump(os.path.join(save_config_path, "{}.py".format(tag)))
 
-    cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py"""
+    # Original training command
+    train_cmd = f"""CUDA_VISIBLE_DEVICES={gpu_id} python tools/train.py --config configs/{tag_name}/{tag}.py"""
+
+    # Add export command to run after training
+    export_cmd = (
+        f"""python tools/export_allocations.py --config configs/{tag_name}/{tag}.py"""
+    )
+
+    # Combine commands with && to run sequentially (second command runs only if first succeeds)
+    cmd = f"""{train_cmd} && {export_cmd}"""
+
     print(cmd)
     os.makedirs(os.path.join(ROOT, "scripts", tag_name), exist_ok=True)
-    with open(os.path.join(ROOT, "scripts", tag_name,"{}.sh".format(tag)), "w") as op:
+    with open(os.path.join(ROOT, "scripts", tag_name, "{}.sh".format(tag)), "w") as op:
         op.write(cmd)
     print(tag)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

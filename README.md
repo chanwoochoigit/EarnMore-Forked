@@ -19,6 +19,39 @@ python tools/pipeline.py
 sh tools/pipeline.sh
 ```
 
+# Instructions for Forked version (tailored for me)
+```
+# Create the necessary directories
+mkdir -p datasets/mcad/raw
+mkdir -p datasets/mcad/features
+mkdir -p datasets/mcad/aux_stocks_files
+# Copy raw data to the raw directory
+# Make sure the file name is uppercase & the first column is "Date" and not "date"
+
+# Create stocks.txt with your assets (uppercase)
+echo -e "SPY\nQQQ\nGLD\nSHY\nTLT\nIEF\nDBC" > datasets/mcad/stocks.txt
+
+# Create asset class files (IMPORTANT: avoid underscores in the category name)
+echo -e "SPY\nQQQ" > datasets/mcad/aux_stocks_files/01_Equity.txt
+echo -e "SHY\nTLT\nIEF" > datasets/mcad/aux_stocks_files/02_FixedIncome.txt
+echo -e "GLD\nDBC" > datasets/mcad/aux_stocks_files/03_Commodity.txt
+
+# run preprocess just as given in the EarnMore codebase
+python tools/preprocess.py --dataset mcad
+
+# Create pipeline scripts for different algorithms
+sh tools/pipeline_mask_sac_mcad.sh
+sh tools/pipeline_ppo_mcad.sh
+sh tools/pipeline_ddpg_mcad.sh
+sh tools/pipeline_mask_dqn_mcad.sh
+
+# Generate the pipeline script
+python tools/make_pipeline.py
+
+# Run a specific algorithm
+export PYTHONPATH=$PWD:$PYTHONPATH
+CUDA_VISIBLE_DEVICES=0 python tools/train.py --config configs/mask_sac/mask_sac_*_mcad_*.py
+
 # References
 
 ElegantRL: https://github.com/AI4Finance-Foundation/ElegantRL

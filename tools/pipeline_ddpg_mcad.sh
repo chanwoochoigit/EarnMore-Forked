@@ -1,0 +1,17 @@
+python tools/make_scripts.py \
+ --config configs/ddpg_portfolio_management.py \
+ --action_wrapper_method softmax \
+ --num_episodes 100 \
+ --dataset mcad \
+ --num_stocks 7 \
+ --buffer_size 10000 \
+ --repeat_times 128 \
+ --gpu_id 0 \
+ --days 10 \
+ --lr 1e-5 \
+ --act_lr 1e-5 \
+ --cri_lr 1e-5 \
+ --rep_lr 1e-5 \
+ --beta_lr 1e-5 \
+ --seed 42 \
+ --T 0.1

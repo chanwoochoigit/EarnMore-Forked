@@ -24,20 +24,20 @@ class CrossAttention(nn.Module):
     fused_attn: Final[bool]
 
     def __init__(
-            self,
-            dim,
-            num_heads=8,
-            qkv_bias=False,
-            qk_norm=False,
-            attn_drop=0.,
-            proj_drop=0.,
-            norm_layer=nn.LayerNorm,
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_norm=False,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        norm_layer=nn.LayerNorm,
     ):
         super().__init__()
-        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+        assert dim % num_heads == 0, "dim should be divisible by num_heads"
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
         self.fused_attn = use_fused_attn()
 
         # self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -59,7 +59,9 @@ class CrossAttention(nn.Module):
 
         if self.fused_attn:
             x = F.scaled_dot_product_attention(
-                q, k, v,
+                q,
+                k,
+                v,
                 dropout_p=self.attn_drop.p,
             )
         else:
@@ -74,22 +76,23 @@ class CrossAttention(nn.Module):
         x = self.proj_drop(x)
         return x
 
+
 class CrossBlock(nn.Module):
 
     def __init__(
-            self,
-            dim,
-            num_heads,
-            mlp_ratio=4.,
-            qkv_bias=False,
-            qk_norm=False,
-            proj_drop=0.,
-            attn_drop=0.,
-            init_values=None,
-            drop_path=0.,
-            act_layer=nn.GELU,
-            norm_layer=nn.LayerNorm,
-            mlp_layer=Mlp,
+        self,
+        dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_norm=False,
+        proj_drop=0.0,
+        attn_drop=0.0,
+        init_values=None,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        mlp_layer=Mlp,
     ):
         super().__init__()
         self.norm1 = norm_layer(dim)
@@ -102,8 +105,10 @@ class CrossBlock(nn.Module):
             proj_drop=proj_drop,
             norm_layer=norm_layer,
         )
-        self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
-        self.drop_path1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.ls1 = (
+            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        )
+        self.drop_path1 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
         self.norm2 = norm_layer(dim)
         self.mlp = mlp_layer(
@@ -112,70 +117,74 @@ class CrossBlock(nn.Module):
             act_layer=act_layer,
             drop=proj_drop,
         )
-        self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
-        self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.ls2 = (
+            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        )
+        self.drop_path2 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(self, q, k, v):
         q = q + self.drop_path1(self.ls1(self.attn(self.norm1(q), k, v)))
         q = q + self.drop_path2(self.ls2(self.mlp(self.norm2(q))))
         return q
 
+
 @NET.register_module(force=True)
 class MaskTimeState(MAE):
-    def __init__(self,
-                *args,
-                embed_type: str = "TimesEmbed",
-                feature_size: List[int] = (10, 99),
-                patch_size: List[int] = (10, 99),
-                t_patch_size: int = 1,
-                num_stocks: int = 420,
-                pred_num_stocks: int = 420,
-                in_chans: int = 1,
-                embed_dim: int = 128,
-                depth: int = 2,
-                num_heads: int = 4,
-                decoder_embed_dim: int = 64,
-                decoder_depth: int = 1,
-                decoder_num_heads: int = 8,
-                mlp_ratio: float = 4.0,
-                norm_layer: nn.LayerNorm = partial(nn.LayerNorm, eps=1e-6),
-                norm_pix_loss: bool = False,
-                cls_embed: bool = True,
-                sep_pos_embed: bool = True,
-                trunc_init: bool = False,
-                no_qkv_bias: bool = False,
-                mask_ratio_min: float = 0.5,
-                mask_ratio_max: float = 1.0,
-                mask_ratio_mu: float = 0.55,
-                mask_ratio_std:float = 0.25,
-                ** kwargs
-                ):
+    def __init__(
+        self,
+        *args,
+        embed_type: str = "TimesEmbed",
+        feature_size: List[int] = (10, 99),
+        patch_size: List[int] = (10, 99),
+        t_patch_size: int = 1,
+        num_stocks: int = 420,
+        pred_num_stocks: int = 420,
+        in_chans: int = 1,
+        embed_dim: int = 128,
+        depth: int = 2,
+        num_heads: int = 4,
+        decoder_embed_dim: int = 64,
+        decoder_depth: int = 1,
+        decoder_num_heads: int = 8,
+        mlp_ratio: float = 4.0,
+        norm_layer: nn.LayerNorm = partial(nn.LayerNorm, eps=1e-6),
+        norm_pix_loss: bool = False,
+        cls_embed: bool = True,
+        sep_pos_embed: bool = True,
+        trunc_init: bool = False,
+        no_qkv_bias: bool = False,
+        mask_ratio_min: float = 0.5,
+        mask_ratio_max: float = 1.0,
+        mask_ratio_mu: float = 0.55,
+        mask_ratio_std: float = 0.25,
+        **kwargs
+    ):
         super(MaskTimeState, self).__init__(
             *args,
             embed_type=embed_type,
-            feature_size = feature_size,
-            patch_size = patch_size,
-            t_patch_size = t_patch_size,
-            num_stocks = num_stocks,
-            pred_num_stocks = pred_num_stocks,
-            in_chans = in_chans,
-            embed_dim = embed_dim,
-            depth = depth,
-            num_heads = num_heads,
-            decoder_embed_dim = decoder_embed_dim,
-            decoder_depth = decoder_depth,
-            decoder_num_heads = decoder_num_heads,
-            mlp_ratio = mlp_ratio,
-            norm_layer = norm_layer,
-            norm_pix_loss = norm_pix_loss,
-            cls_embed = cls_embed,
-            sep_pos_embed = sep_pos_embed,
-            trunc_init = trunc_init,
-            no_qkv_bias = no_qkv_bias,
-            mask_ratio_min = mask_ratio_min,
-            mask_ratio_max = mask_ratio_max,
-            mask_ratio_mu = mask_ratio_mu,
-            mask_ratio_std = mask_ratio_std,
+            feature_size=feature_size,
+            patch_size=patch_size,
+            t_patch_size=t_patch_size,
+            num_stocks=num_stocks,
+            pred_num_stocks=pred_num_stocks,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+            depth=depth,
+            num_heads=num_heads,
+            decoder_embed_dim=decoder_embed_dim,
+            decoder_depth=decoder_depth,
+            decoder_num_heads=decoder_num_heads,
+            mlp_ratio=mlp_ratio,
+            norm_layer=norm_layer,
+            norm_pix_loss=norm_pix_loss,
+            cls_embed=cls_embed,
+            sep_pos_embed=sep_pos_embed,
+            trunc_init=trunc_init,
+            no_qkv_bias=no_qkv_bias,
+            mask_ratio_min=mask_ratio_min,
+            mask_ratio_max=mask_ratio_max,
+            mask_ratio_mu=mask_ratio_mu,
+            mask_ratio_std=mask_ratio_std,
             **kwargs,
         )
 
@@ -232,7 +241,7 @@ class MaskTimeState(MAE):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def forward_encoder(self, x, mask = None, ids_restore = None, if_mask = True):
+    def forward_encoder(self, x, mask=None, ids_restore=None, if_mask=True):
         """
         b, c, n, d, f = x.shape # batch size, in chans, num stocks, days, features
         """
@@ -246,7 +255,9 @@ class MaskTimeState(MAE):
                 x, mask, ids_restore, ids_keep = self.random_masking(x, mask_ratio)
                 x = x.view(B, -1, C)
             else:
-                ids_keep = torch.argsort(ids_restore, dim=1)[:, :(mask[0, :] == 0).sum().item()]
+                ids_keep = torch.argsort(ids_restore, dim=1)[
+                    :, : (mask[0, :] == 0).sum().item()
+                ]
                 x = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, C))
         else:
             ids_keep = torch.arange(0, L).unsqueeze(0).repeat(B, 1).to(x.device)
@@ -393,13 +404,13 @@ class MaskTimeState(MAE):
 
         return x
 
-    def forward_state(self,x, mask = None, ids_restore = None):
+    def forward_state(self, x, mask=None, ids_restore=None):
         if len(x.shape) == 4:
             x = x.unsqueeze(1)
 
-        x, mask, ids_restore = self.forward_encoder(x,
-                                                    mask = mask,
-                                                    ids_restore = ids_restore)
+        x, mask, ids_restore = self.forward_encoder(
+            x, mask=mask, ids_restore=ids_restore
+        )
 
         N = x.shape[0]
         T = self.patch_embed.t_grid_size
@@ -494,20 +505,21 @@ class MaskTimeState(MAE):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
-    def forward(self, x, mask = None, ids_restore = None):
+    def forward(self, x, mask=None, ids_restore=None):
         if len(x.shape) == 4:
             x = x.unsqueeze(1)
-        latent, mask, ids_restore = self.forward_encoder(x,
-                                                         mask = mask,
-                                                         ids_restore = ids_restore)
+        latent, mask, ids_restore = self.forward_encoder(
+            x, mask=mask, ids_restore=ids_restore
+        )
 
-        kv = self.forward_encoder(x,if_mask=False)[0]
+        kv = self.forward_encoder(x, if_mask=False)[0]
 
         pred = self.forward_decoder(latent, kv, ids_restore)
         loss = self.forward_loss(x, pred, mask)
         return loss, mask, ids_restore
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     device = torch.device("cpu")
 
     model = MaskTimeState(
@@ -517,7 +529,7 @@ if __name__ == '__main__':
         t_patch_size=1,
         input_dim=102,
         temporal_dim=3,
-        embed_dim=128
+        embed_dim=128,
     ).to(device)
     print(model)
 
