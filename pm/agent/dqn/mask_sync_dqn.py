@@ -16,40 +16,48 @@ from pm.registry import NET
 from pm.registry import CRITERION
 from pm.registry import OPTIMIZER
 from pm.registry import SCHEDULER
-from pm.utils import ReplayBuffer, build_storage, get_optim_param, get_action_wrapper, forward_action_wrapper
+from pm.utils import (
+    ReplayBuffer,
+    build_storage,
+    get_optim_param,
+    get_action_wrapper,
+    forward_action_wrapper,
+)
 from pm.metrics import ARR, VOL, DD, MDD, SR, CR, SOR
 
+
 @AGENT.register_module()
-class AgentMaskSyncDQN():
-    def __init__(self,
-                 act_lr: float = 5e-5,
-                 cri_lr: float = 5e-5,
-                 rep_net: dict = None,
-                 act_net: dict = None,
-                 cri_net: dict = None,
-                 criterion: dict = None,
-                 optimizer: dict = None,
-                 scheduler: dict = None,
-                 if_use_per: bool = False,
-                 if_use_rep: bool = True,
-                 if_use_beta: bool = True,
-                 rep_loss_weight: float = 0.1,
-                 beta_loss_weight: float = 0.1,
-                 num_envs: int = 1,
-                 max_step: int = 1e4,
-                 transition_shape: dict = None,
-                 gamma: float = 0.99,
-                 reward_scale: int = 2**0,
-                 repeat_times: float = 1.0,
-                 batch_size: int = 512,
-                 clip_grad_norm: float = 3.0,
-                 soft_update_tau: float = .0,
-                 state_value_tau: float = 5e-3,
-                 discretized_low = 0,
-                 discretized_high = 10,
-                 device: torch.device = torch.device("cuda"),
-                 action_wrapper_method: str = "reweight",
-                 ):
+class AgentMaskSyncDQN:
+    def __init__(
+        self,
+        act_lr: float = 5e-5,
+        cri_lr: float = 5e-5,
+        rep_net: dict = None,
+        act_net: dict = None,
+        cri_net: dict = None,
+        criterion: dict = None,
+        optimizer: dict = None,
+        scheduler: dict = None,
+        if_use_per: bool = False,
+        if_use_rep: bool = True,
+        if_use_beta: bool = True,
+        rep_loss_weight: float = 0.1,
+        beta_loss_weight: float = 0.1,
+        num_envs: int = 1,
+        max_step: int = 1e4,
+        transition_shape: dict = None,
+        gamma: float = 0.99,
+        reward_scale: int = 2**0,
+        repeat_times: float = 1.0,
+        batch_size: int = 512,
+        clip_grad_norm: float = 3.0,
+        soft_update_tau: float = 0.0,
+        state_value_tau: float = 5e-3,
+        discretized_low=0,
+        discretized_high=10,
+        device: torch.device = torch.device("cuda"),
+        action_wrapper_method: str = "reweight",
+    ):
 
         self.act_lr = act_lr
         self.cri_lr = cri_lr
@@ -82,18 +90,22 @@ class AgentMaskSyncDQN():
 
         self.rep = NET.build(rep_net).to(self.device)
         self.act = self.act_target = NET.build(act_net).to(self.device)
-        self.cri = self.cri_target = NET.build(cri_net).to(self.device) if cri_net else self.act
+        self.cri = self.cri_target = (
+            NET.build(cri_net).to(self.device) if cri_net else self.act
+        )
         self.act_target = self.cri_target = deepcopy(self.act)
 
         # build optimizer
         act_optimizer = deepcopy(optimizer)
-        act_optimizer.update(dict(params=self.act.parameters(), lr = self.act_lr))
+        act_optimizer.update(dict(params=self.act.parameters(), lr=self.act_lr))
         self.act_optimizer = OPTIMIZER.build(act_optimizer)
         self.act_optimizer.parameters = MethodType(get_optim_param, self.act_optimizer)
 
         cri_optimizer = deepcopy(optimizer)
-        cri_optimizer.update(dict(params=self.cri.parameters(), lr = self.cri_lr))
-        self.cri_optimizer = OPTIMIZER.build(cri_optimizer) if cri_net else self.act_optimizer
+        cri_optimizer.update(dict(params=self.cri.parameters(), lr=self.cri_lr))
+        self.cri_optimizer = (
+            OPTIMIZER.build(cri_optimizer) if cri_net else self.act_optimizer
+        )
         self.cri_optimizer.parameters = MethodType(get_optim_param, self.cri_optimizer)
 
         # build scheduler
@@ -103,12 +115,16 @@ class AgentMaskSyncDQN():
         self.cri_scheduler = SCHEDULER.build(scheduler)
 
         # get wrapper
-        self.get_action = get_action_wrapper(self.act.get_action, method=action_wrapper_method)
-        self.forward_action = forward_action_wrapper(self.act.forward, method=action_wrapper_method)
+        self.get_action = get_action_wrapper(
+            self.act.get_action, method=action_wrapper_method
+        )
+        self.forward_action = forward_action_wrapper(
+            self.act.forward, method=action_wrapper_method
+        )
 
         self.if_use_per = if_use_per
         if self.if_use_per:
-            criterion.update(dict(reduction = "none"))
+            criterion.update(dict(reduction="none"))
             self.get_obj_critic = self.get_obj_critic_per
         else:
             criterion.update(dict(reduction="mean"))
@@ -120,7 +136,7 @@ class AgentMaskSyncDQN():
     def get_state_dict(self):
         print("get state dict")
         state_dict = {
-            "rep":self.rep.state_dict(),
+            "rep": self.rep.state_dict(),
             "act": self.act.state_dict(),
             "cri": self.cri.state_dict(),
             "act_target": self.act_target.state_dict(),
@@ -148,27 +164,49 @@ class AgentMaskSyncDQN():
 
     def explore_env(self, env, horizon_len: int) -> Tuple[Tensor, ...]:
 
-        states = build_storage((horizon_len, *self.transition_shape["state"]["shape"]),
-                               self.transition_shape["state"]["type"], self.device)
-        actions = build_storage((horizon_len, *self.transition_shape["action"]["shape"]),
-                                self.transition_shape["action"]["type"], self.device)
-        masks = build_storage((horizon_len, *self.transition_shape["mask"]["shape"]),
-                              self.transition_shape["mask"]["type"], self.device)
-        ids_restores = build_storage((horizon_len, *self.transition_shape["ids_restore"]["shape"]),
-                                     self.transition_shape["ids_restore"]["type"], self.device)
-        rewards = build_storage((horizon_len, *self.transition_shape["reward"]["shape"]),
-                                self.transition_shape["reward"]["type"], self.device)
-        dones = build_storage((horizon_len, *self.transition_shape["done"]["shape"]),
-                              self.transition_shape["done"]["type"], self.device)
-        next_states = build_storage((horizon_len, *self.transition_shape["next_state"]["shape"]),
-                                    self.transition_shape["next_state"]["type"], self.device)
+        states = build_storage(
+            (horizon_len, *self.transition_shape["state"]["shape"]),
+            self.transition_shape["state"]["type"],
+            self.device,
+        )
+        actions = build_storage(
+            (horizon_len, *self.transition_shape["action"]["shape"]),
+            self.transition_shape["action"]["type"],
+            self.device,
+        )
+        masks = build_storage(
+            (horizon_len, *self.transition_shape["mask"]["shape"]),
+            self.transition_shape["mask"]["type"],
+            self.device,
+        )
+        ids_restores = build_storage(
+            (horizon_len, *self.transition_shape["ids_restore"]["shape"]),
+            self.transition_shape["ids_restore"]["type"],
+            self.device,
+        )
+        rewards = build_storage(
+            (horizon_len, *self.transition_shape["reward"]["shape"]),
+            self.transition_shape["reward"]["type"],
+            self.device,
+        )
+        dones = build_storage(
+            (horizon_len, *self.transition_shape["done"]["shape"]),
+            self.transition_shape["done"]["type"],
+            self.device,
+        )
+        next_states = build_storage(
+            (horizon_len, *self.transition_shape["next_state"]["shape"]),
+            self.transition_shape["next_state"]["type"],
+            self.device,
+        )
 
         state = self.last_state
 
         for t in range(horizon_len):
             b, e, n, d, f = state.shape
             rep_state, mask, ids_restore = self.rep.forward_state(
-                rearrange(state, "b e n d f -> (b e) n d f", b=b, e=e))
+                rearrange(state, "b e n d f -> (b e) n d f", b=b, e=e)
+            )
             action = self.get_action(rep_state)
 
             states[t] = state
@@ -176,9 +214,17 @@ class AgentMaskSyncDQN():
             ary_action = action.detach().cpu().numpy()
             next_state, reward, done, _ = env.step(ary_action)
 
-            state = torch.as_tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)  # next state
-            reward = torch.as_tensor(reward, dtype=torch.float32, device=self.device).unsqueeze(0)
-            done = torch.as_tensor(done, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = torch.as_tensor(
+                next_state, dtype=torch.float32, device=self.device
+            ).unsqueeze(
+                0
+            )  # next state
+            reward = torch.as_tensor(
+                reward, dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
+            done = torch.as_tensor(
+                done, dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
 
             actions[t] = action.unsqueeze(0)
             masks[t] = mask
@@ -193,7 +239,9 @@ class AgentMaskSyncDQN():
         dones = dones.type(torch.float32)
         return states, actions, masks, ids_restores, rewards, dones, next_states
 
-    def optimizer_update(self, optimizer: torch.optim, objective: Tensor, lr_scheduler=None, step=None):
+    def optimizer_update(
+        self, optimizer: torch.optim, objective: Tensor, lr_scheduler=None, step=None
+    ):
         """minimize the optimization objective via update the network parameters
 
         optimizer: `optimizer = torch.optim.SGD(net.parameters(), learning_rate)`
@@ -201,12 +249,15 @@ class AgentMaskSyncDQN():
         """
         optimizer.zero_grad()
         objective.backward()
-        clip_grad_norm_(parameters=optimizer.param_groups[0]["params"], max_norm=self.clip_grad_norm)
+        clip_grad_norm_(
+            parameters=optimizer.param_groups[0]["params"], max_norm=self.clip_grad_norm
+        )
         optimizer.step()
         lr_scheduler.step_update(step)
 
-    def optimizer_update_amp(self, optimizer: torch.optim, objective: Tensor, lr_scheduler=None,
-                             step=None):  # automatic mixed precision
+    def optimizer_update_amp(
+        self, optimizer: torch.optim, objective: Tensor, lr_scheduler=None, step=None
+    ):  # automatic mixed precision
         """minimize the optimization objective via update the network parameters
 
         amp: Automatic Mixed Precision
@@ -221,13 +272,17 @@ class AgentMaskSyncDQN():
         amp_scale.unscale_(optimizer)  # amp
 
         # from torch.nn.utils import clip_grad_norm_
-        clip_grad_norm_(parameters=optimizer.param_groups[0]["params"], max_norm=self.clip_grad_norm)
+        clip_grad_norm_(
+            parameters=optimizer.param_groups[0]["params"], max_norm=self.clip_grad_norm
+        )
         amp_scale.step(optimizer)  # optimizer.step()
         amp_scale.update()  # optimizer.step()
         lr_scheduler.step_update(step)
 
     @staticmethod
-    def soft_update(target_net: torch.nn.Module, current_net: torch.nn.Module, tau: float):
+    def soft_update(
+        target_net: torch.nn.Module, current_net: torch.nn.Module, tau: float
+    ):
         """soft update target network via current network
 
         target_net: update target network via current network to make training more stable.
@@ -238,8 +293,7 @@ class AgentMaskSyncDQN():
             tar.data.copy_(cur.data * tau + tar.data * (1.0 - tau))
 
     def update_net(self, buffer: ReplayBuffer) -> dict:
-
-        '''update network'''
+        """update network"""
         obj_critics = 0.0
         obj_actors = 0.0
         rep_losses = 0.0
@@ -247,16 +301,27 @@ class AgentMaskSyncDQN():
 
         update_times = int(self.repeat_times)
         assert update_times >= 1
-        for _ in tqdm(range(update_times), bar_format="update net batch " + "{bar:50}{percentage:3.0f}%|{elapsed}/{remaining}{postfix}"):
-            '''objective of critic (loss function of critic)'''
-            obj_critic, q_value, rep_loss, beta_loss, state, mask, ids_restore = self.get_obj_critic(buffer, self.batch_size)
+        for _ in tqdm(
+            range(update_times),
+            bar_format="update net batch "
+            + "{bar:50}{percentage:3.0f}%|{elapsed}/{remaining}{postfix}",
+        ):
+            """objective of critic (loss function of critic)"""
+            obj_critic, q_value, rep_loss, beta_loss, state, mask, ids_restore = (
+                self.get_obj_critic(buffer, self.batch_size)
+            )
             obj_critics += obj_critic.item()
             obj_actors += q_value.mean().item()
 
             rep_losses += rep_loss.item()
             beta_losses += beta_loss.item()
 
-            self.optimizer_update(self.cri_optimizer, obj_critic, lr_scheduler=self.cri_scheduler, step=self.global_step)
+            self.optimizer_update(
+                self.cri_optimizer,
+                obj_critic,
+                lr_scheduler=self.cri_scheduler,
+                step=self.global_step,
+            )
             self.soft_update(self.cri_target, self.cri, self.soft_update_tau)
 
             self.global_step += 1
@@ -269,8 +334,8 @@ class AgentMaskSyncDQN():
             "obj_actors": obj_actors / update_times,
             "rep_losses": rep_losses / update_times,
             "beta_losses": beta_losses / update_times,
-            "act_lr":act_lr,
-            "cri_lr":cri_lr,
+            "act_lr": act_lr,
+            "cri_lr": cri_lr,
         }
 
         return stats
@@ -303,11 +368,13 @@ class AgentMaskSyncDQN():
         masks = np.array(masks)
 
         while True:
-            state = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = torch.as_tensor(
+                state, dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
             b, e, n, d, f = state.shape
             state = rearrange(state, "b e n d f -> (b e) n d f", b=b, e=e)
             rep_state, _, _ = self.rep.forward_state(state)
-            action = self.forward_action(x = rep_state, mask = masks)
+            action = self.forward_action(x=rep_state, mask=masks)
 
             ary_action = action.detach().cpu().numpy()
             state, reward, done, info = environment.step(ary_action)  # next_state
@@ -330,7 +397,7 @@ class AgentMaskSyncDQN():
             #     last_ary_action = ary_action
 
             for i in range(num_envs):
-                rets[i].append(info[i]['portfolio_ret'])
+                rets[i].append(info[i]["portfolio_ret"])
 
             if np.sum(done) > 0:  # if any done
                 break
@@ -360,22 +427,26 @@ class AgentMaskSyncDQN():
             # calculate sortino ratio
             sor = SOR(rets_ary, dd)
 
-            metrics.update({
-                "ARR%_env{}".format(i): arr * 100,
-                "SR_env{}".format(i): sr,
-                "CR_env{}".format(i): cr,
-                "MDD%_env{}".format(i): mdd * 100,
-                "VOL_env{}".format(i): vol,
-                "DD_env{}".format(i): dd,
-                "SOR_env{}".format(i): sor,
-            })
+            metrics.update(
+                {
+                    "ARR%_env{}".format(i): arr * 100,
+                    "SR_env{}".format(i): sr,
+                    "CR_env{}".format(i): cr,
+                    "MDD%_env{}".format(i): mdd * 100,
+                    "VOL_env{}".format(i): vol,
+                    "DD_env{}".format(i): dd,
+                    "SOR_env{}".format(i): sor,
+                }
+            )
 
         if if_visualize:
             return metrics, fig_list
         else:
             return metrics
 
-    def get_obj_critic_raw(self, buffer: ReplayBuffer, batch_size: int) -> Tuple[Tensor,Tensor,Tensor,Tensor,Tensor,Tensor,Tensor]:
+    def get_obj_critic_raw(
+        self, buffer: ReplayBuffer, batch_size: int
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         """
         Calculate the loss of the network and predict Q values with **uniform sampling**.
 
@@ -383,11 +454,13 @@ class AgentMaskSyncDQN():
         :param batch_size: the size of batch data for Stochastic Gradient Descent (SGD).
         :return: the loss of the network and Q values.
         """
-        rep_loss = .0
-        beta_loss = .0
+        rep_loss = 0.0
+        beta_loss = 0.0
 
         with torch.no_grad():
-            states, actions, masks, ids_restores, rewards, dones, next_states = buffer.sample(batch_size)
+            states, actions, masks, ids_restores, rewards, dones, next_states = (
+                buffer.sample(batch_size)
+            )
 
             if states.device != self.device:
                 states = states.to(self.device)
@@ -398,23 +471,30 @@ class AgentMaskSyncDQN():
                 dones = dones.to(self.device)
                 next_states = next_states.to(self.device)
 
-            rep_next_states, _, _ = self.rep.forward_state(next_states,
-                                                     mask=masks,
-                                                     ids_restore=ids_restores)
+            rep_next_states, _, _ = self.rep.forward_state(
+                next_states, mask=masks, ids_restore=ids_restores
+            )
 
-            next_qs = self.cri_target.get_value(rep_next_states) # next q_values
+            next_qs = self.cri_target.get_value(rep_next_states)  # next q_values
             q_labels = rewards + (1.0 - dones) * self.gamma * next_qs
 
-            rep_states, _, _ = self.rep.forward_state(states,
-                                                mask=masks,
-                                                ids_restore=ids_restores)
+            rep_states, _, _ = self.rep.forward_state(
+                states, mask=masks, ids_restore=ids_restores
+            )
 
         q_values = self.cri.get_value(rep_states)
         obj_critic = self.criterion(q_values, q_labels)
 
         if self.if_use_beta:
             mask_bool = torch.concat(
-                [torch.zeros((rep_states.shape[0], 1), dtype=torch.bool, device=self.device), masks], dim=1).bool()
+                [
+                    torch.zeros(
+                        (rep_states.shape[0], 1), dtype=torch.bool, device=self.device
+                    ),
+                    masks,
+                ],
+                dim=1,
+            ).bool()
 
             weight = self.forward_action(rep_states)
 
@@ -428,7 +508,9 @@ class AgentMaskSyncDQN():
 
         return obj_critic, q_values, rep_loss, beta_loss, states, masks, ids_restores
 
-    def get_obj_critic_per(self, buffer: ReplayBuffer, batch_size: int) -> Tuple[Tensor,Tensor,Tensor,Tensor,Tensor,Tensor,Tensor]:
+    def get_obj_critic_per(
+        self, buffer: ReplayBuffer, batch_size: int
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         """
         Calculate the loss of the network and predict Q values with **Prioritized Experience Replay (PER)**.
 
@@ -436,11 +518,21 @@ class AgentMaskSyncDQN():
         :param batch_size: the size of batch data for Stochastic Gradient Descent (SGD).
         :return: the loss of the network and Q values.
         """
-        rep_loss = .0
-        beta_loss = .0
+        rep_loss = 0.0
+        beta_loss = 0.0
 
         with torch.no_grad():
-            states, actions, masks, ids_restores, rewards, dones, next_states, is_weights, is_indices = buffer.sample_for_per(batch_size)
+            (
+                states,
+                actions,
+                masks,
+                ids_restores,
+                rewards,
+                dones,
+                next_states,
+                is_weights,
+                is_indices,
+            ) = buffer.sample_for_per(batch_size)
 
             if states.device != self.device:
                 states = states.to(self.device)
@@ -453,24 +545,33 @@ class AgentMaskSyncDQN():
                 is_weights = is_weights.to(self.device)
                 is_indices = is_indices.to(self.device)
 
-            rep_next_states, _, _ = self.rep.forward_state(next_states,
-                                                     mask=masks,
-                                                     ids_restore=ids_restores)
+            rep_next_states, _, _ = self.rep.forward_state(
+                next_states, mask=masks, ids_restore=ids_restores
+            )
 
             next_qs = self.cri_target.get_value(rep_next_states)  # next q_values
             q_labels = rewards + (1.0 - dones) * self.gamma * next_qs
 
-            rep_states, _, _ = self.rep.forward_state(states,
-                                                mask=masks,
-                                                ids_restore=ids_restores)
+            rep_states, _, _ = self.rep.forward_state(
+                states, mask=masks, ids_restore=ids_restores
+            )
 
         q_values = self.cri.get_value(rep_states)
-        td_errors = self.criterion(q_values, q_labels)  # or td_error = (q_value - q_label).abs()
+        td_errors = self.criterion(
+            q_values, q_labels
+        )  # or td_error = (q_value - q_label).abs()
         obj_critic = (td_errors * is_weights).mean()
 
         if self.if_use_beta:
             mask_bool = torch.concat(
-                [torch.zeros((rep_states.shape[0], 1), dtype=torch.bool, device=self.device), masks], dim=1).bool()
+                [
+                    torch.zeros(
+                        (rep_states.shape[0], 1), dtype=torch.bool, device=self.device
+                    ),
+                    masks,
+                ],
+                dim=1,
+            ).bool()
 
             weight = self.forward_action(rep_states)
 
@@ -480,7 +581,9 @@ class AgentMaskSyncDQN():
 
         if self.if_use_rep:
             rep_loss, _, _ = self.rep(states, masks, ids_restores)
-            td_errors = self.criterion(q_values, q_labels)  # or td_error = (q_value - q_label).abs()
+            td_errors = self.criterion(
+                q_values, q_labels
+            )  # or td_error = (q_value - q_label).abs()
             obj_critic = obj_critic + self.rep_loss_weight * rep_loss
 
         buffer.td_error_update_for_per(is_indices.detach(), td_errors.detach())

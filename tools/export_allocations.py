@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from mmengine.config import Config
 import pandas as pd
+import gym
 
 ROOT = str(Path(__file__).resolve().parents[1])
 sys.path.append(ROOT)
@@ -12,6 +13,10 @@ sys.path.append(ROOT)
 from pm.registry import ENVIRONMENT, AGENT, DATASET
 from pm.utils import update_data_root, load_checkpoint
 from pm.utils.export import export_allocation_history
+from copy import deepcopy
+
+ROOT = str(Path(__file__).resolve().parents[1])
+sys.path.append(ROOT)
 
 
 def parse_args():
@@ -26,6 +31,14 @@ def parse_args():
         help="Output directory (default: same as checkpoint dir)",
     )
     return parser.parse_args()
+
+
+def make_env(env_id, env_params):
+    def thunk():
+        env = gym.make(env_id, **env_params)
+        return env
+
+    return thunk
 
 
 def main():
@@ -73,13 +86,28 @@ def main():
         )
     )
     backtest_environment = ENVIRONMENT.build(cfg.environment)
-
+    backtest_envs = gym.vector.SyncVectorEnv(
+        [
+            make_env(
+                "PortfolioManagement-v0",
+                env_params=dict(
+                    env=deepcopy(backtest_environment),
+                    transition_shape=cfg.transition_shape,
+                ),
+            )
+            for i in range(len(backtest_environment.aux_stocks))
+        ]
+    )
     # Manually set day to start at the beginning of the dataset
     backtest_environment.day = backtest_environment.days - 1  # Start at beginning
 
     print("Building agent...")
     cfg.agent.update(dict(device=device))
     agent = AGENT.build(cfg.agent)
+
+    # Set up aux_stocks
+    if hasattr(backtest_envs.envs[0], "aux_stocks"):
+        agent.aux_stocks = backtest_envs.envs[0].aux_stocks
 
     print(f"Loading checkpoint from {checkpoint_path}...")
     episode = load_checkpoint(agent, checkpoint_path)
@@ -91,15 +119,15 @@ def main():
 
     # Export allocation histories
     print("Exporting allocation histories...")
-
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
+    output_name = exp_path.split("workdir/")[1].split("_daysx")[0].replace("nepx", "")
+    output_path = os.path.join(output_dir, f"{output_name}.csv")
+    alloc_h_df = export_allocation_history(agent, backtest_envs, output_path)
 
-    output_path = os.path.join(output_dir, "allocation_history.csv")
-    alloc_h_df = export_allocation_history(agent, backtest_environment, output_path)
-
+    # add column names
     alloc_h_df = alloc_h_df.sort_values(by="date")
-    stock_names = ["cash"] + backtest_environment.stocks  # assign assets
+    stock_names = ["cash"] + backtest_envs.envs[0].stocks  # assign assets
 
     # Rename the columns to match stock names
     # Column 0 is the date, columns 1+ are allocations

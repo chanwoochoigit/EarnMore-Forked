@@ -7,9 +7,9 @@ num_envs = 1
 num_features = 102  # num features name + num temporals name
 temporal_dim = 3  # weekday, day, month
 train_start_date = "2007-02-06"
-val_start_date = "2019-09-25"
-test_start_date = "2022-06-08"
-test_end_date = "2025-02-28"
+val_start_date = "2019-11-14"
+test_start_date = "2022-08-08"
+test_end_date = "2025-05-01"
 if_use_per = False
 if_use_rep = True
 if_use_beta = True
@@ -58,9 +58,9 @@ transition_shape = dict(
 dataset = dict(
     type="PortfolioManagementDataset",
     root=root,
-    data_path="datasets/dj30/features",
-    stocks_path="datasets/dj30/stocks.txt",
-    aux_stocks_path="datasets/dj30/aux_stocks_files",
+    data_path="datasets/mcad/features",
+    stocks_path="datasets/mcad/stocks.txt",
+    aux_stocks_path="datasets/mcad/aux_stocks_files",
     features_name=[
         "open",
         "high",

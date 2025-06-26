@@ -25,6 +25,8 @@ sh tools/pipeline.sh
 mkdir -p datasets/mcad/raw
 mkdir -p datasets/mcad/features
 mkdir -p datasets/mcad/aux_stocks_files
+# Copy raw data to the raw directory
+# Make sure the file name is uppercase & the first column is "Date" and not "date"
 
 # Create stocks.txt with your assets (uppercase)
 echo -e "SPY\nQQQ\nGLD\nSHY\nTLT\nIEF\nDBC" > datasets/mcad/stocks.txt

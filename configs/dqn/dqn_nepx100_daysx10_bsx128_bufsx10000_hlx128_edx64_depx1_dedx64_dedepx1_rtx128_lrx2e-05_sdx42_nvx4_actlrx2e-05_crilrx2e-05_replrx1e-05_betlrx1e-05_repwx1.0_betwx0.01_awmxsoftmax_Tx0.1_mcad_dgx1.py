@@ -1,51 +1,39 @@
 root = None
 workdir = 'workdir'
-tag = 'mask_sac_nepx3_daysx10_bsx128_bufsx10000_hlx128_edx64_depx1_dedx64_dedepx1_rtx128_lrx1e-05_sdx42_nvx4_actlrx1e-05_crilrx1e-05_replrx1e-05_betlrx1e-05_repwx1.0_betwx0.01_awmxsoftmax_Tx0.1_mcad_dgx0'
+tag = 'dqn_nepx100_daysx10_bsx128_bufsx10000_hlx128_edx64_depx1_dedx64_dedepx1_rtx128_lrx2e-05_sdx42_nvx4_actlrx2e-05_crilrx2e-05_replrx1e-05_betlrx1e-05_repwx1.0_betwx0.01_awmxsoftmax_Tx0.1_mcad_dgx1'
 num_stocks = 7
 num_envs = 4
+discretized_low = 0
+discretized_high = 10
 num_features = 102
 temporal_dim = 3
 train_start_date = '2007-02-06'
-val_start_date = '2019-09-25'
-test_start_date = '2022-06-08'
-test_end_date = '2025-02-28'
+val_start_date = '2019-10-25'
+test_start_date = '2022-07-19'
+test_end_date = '2025-04-14'
 if_use_per = False
-if_use_rep = True
-if_use_beta = True
 if_norm = True
 if_norm_temporal = False
 save_freq = 20
+n_steps_per_episode = 1280
 repeat_times = 128
 action_wrapper_method = 'softmax'
-T = 0.1
-n_steps_per_episode = 1024
-num_episodes = 3
+num_episodes = 100
 days = 10
 batch_size = 128
 buffer_size = 10000
 horizon_len = 128
 embed_dim = 64
-decoder_embed_dim = 64
 depth = 1
-decoder_depth = 1
-lr = 1e-05
-act_lr = 1e-05
-cri_lr = 1e-05
-rep_lr = 1e-05
-beta_lr = 1e-05
-rep_loss_weight = 1.0
-beta_loss_weight = 0.01
+lr = 2e-05
+explore_rate = 0.25
 seed = 42
 feature_size = (10, 102)
 patch_size = (10, 102)
-transition = [
-    'state', 'action', 'mask', 'ids_restore', 'reward', 'done', 'next_state'
-]
+transition = ['state', 'action', 'reward', 'done', 'next_state']
 transition_shape = dict(
     state=dict(shape=(4, 7, 10, 102), type='float32'),
     action=dict(shape=(4, 8), type='float32'),
-    mask=dict(shape=(4, 7), type='int32'),
-    ids_restore=dict(shape=(4, 7), type='int64'),
     reward=dict(shape=(4, ), type='float32'),
     done=dict(shape=(4, ), type='float32'),
     next_state=dict(shape=(4, 7, 10, 102), type='float32'))
@@ -87,36 +75,23 @@ environment = dict(
     end_date=None,
     initial_amount=1000.0,
     transaction_cost_pct=0.001)
-rep_net = dict(
-    type='MaskTimeState',
+act_net = dict(
+    type='QNet',
     embed_type='TimesEmbed',
     feature_size=(10, 102),
-    patch_size=(10, 102),
     t_patch_size=1,
     num_stocks=7,
-    pred_num_stocks=7,
-    in_chans=1,
     input_dim=102,
     temporal_dim=3,
+    in_chans=1,
     embed_dim=64,
     depth=1,
-    num_heads=4,
-    decoder_embed_dim=64,
-    decoder_depth=1,
-    decoder_num_heads=8,
-    mlp_ratio=4.0,
-    norm_pix_loss=False,
     cls_embed=True,
-    sep_pos_embed=True,
-    trunc_init=False,
-    no_qkv_bias=False,
-    mask_ratio_min=0.6,
-    mask_ratio_max=0.8,
-    mask_ratio_mu=0.7,
-    mask_ratio_std=0.1)
-act_net = dict(type='ActorMaskSAC', embed_dim=64, depth=1, cls_embed=True)
-cri_net = dict(type='CriticMaskSAC', embed_dim=64, depth=1, cls_embed=True)
-criterion = dict(type='MSELoss', reduction='none')
+    explore_rate=0.25,
+    discretized_low=0,
+    discretized_high=10)
+cri_net = None
+criterion = dict(type='SmoothL1Loss', reduction='none')
 scheduler = dict(
     type='MultiStepLRScheduler',
     multi_steps=[614400, 1024000, 1433600],
@@ -126,8 +101,8 @@ scheduler = dict(
     t_mul=1.0,
     lr_min=0.0,
     decay_rate=1.0,
-    warmup_t=307200,
-    warmup_lr_init=1e-08,
+    warmup_t=102400,
+    warmup_lr_init=0,
     warmup_prefix=False,
     cycle_limit=0,
     t_in_epochs=False,
@@ -136,44 +111,29 @@ scheduler = dict(
     noise_std=1.0,
     noise_seed=42,
     initialize=True)
-optimizer = dict(type='AdamW', params=None, lr=1e-05)
+optimizer = dict(type='AdamW', params=None, lr=2e-05)
 agent = dict(
-    type='AgentMaskSAC',
-    act_lr=1e-05,
-    cri_lr=1e-05,
-    rep_lr=1e-05,
-    beta_lr=1e-05,
-    rep_net=dict(
-        type='MaskTimeState',
+    type='AgentDQN',
+    act_lr=2e-05,
+    cri_lr=2e-05,
+    act_net=dict(
+        type='QNet',
         embed_type='TimesEmbed',
         feature_size=(10, 102),
-        patch_size=(10, 102),
         t_patch_size=1,
         num_stocks=7,
-        pred_num_stocks=7,
-        in_chans=1,
         input_dim=102,
         temporal_dim=3,
+        in_chans=1,
         embed_dim=64,
         depth=1,
-        num_heads=4,
-        decoder_embed_dim=64,
-        decoder_depth=1,
-        decoder_num_heads=8,
-        mlp_ratio=4.0,
-        norm_pix_loss=False,
         cls_embed=True,
-        sep_pos_embed=True,
-        trunc_init=False,
-        no_qkv_bias=False,
-        mask_ratio_min=0.6,
-        mask_ratio_max=0.8,
-        mask_ratio_mu=0.7,
-        mask_ratio_std=0.1),
-    act_net=dict(type='ActorMaskSAC', embed_dim=64, depth=1, cls_embed=True),
-    cri_net=dict(type='CriticMaskSAC', embed_dim=64, depth=1, cls_embed=True),
-    criterion=dict(type='MSELoss', reduction='none'),
-    optimizer=dict(type='AdamW', params=None, lr=1e-05),
+        explore_rate=0.25,
+        discretized_low=0,
+        discretized_high=10),
+    cri_net=None,
+    criterion=dict(type='SmoothL1Loss', reduction='none'),
+    optimizer=dict(type='AdamW', params=None, lr=2e-05),
     scheduler=dict(
         type='MultiStepLRScheduler',
         multi_steps=[614400, 1024000, 1433600],
@@ -183,8 +143,8 @@ agent = dict(
         t_mul=1.0,
         lr_min=0.0,
         decay_rate=1.0,
-        warmup_t=307200,
-        warmup_lr_init=1e-08,
+        warmup_t=102400,
+        warmup_lr_init=0,
         warmup_prefix=False,
         cycle_limit=0,
         t_in_epochs=False,
@@ -194,16 +154,10 @@ agent = dict(
         noise_seed=42,
         initialize=True),
     if_use_per=False,
-    if_use_rep=True,
-    if_use_beta=True,
-    rep_loss_weight=1.0,
-    beta_loss_weight=0.01,
     num_envs=4,
     transition_shape=dict(
         state=dict(shape=(4, 7, 10, 102), type='float32'),
         action=dict(shape=(4, 8), type='float32'),
-        mask=dict(shape=(4, 7), type='int32'),
-        ids_restore=dict(shape=(4, 7), type='int64'),
         reward=dict(shape=(4, ), type='float32'),
         done=dict(shape=(4, ), type='float32'),
         next_state=dict(shape=(4, 7, 10, 102), type='float32')),
@@ -215,9 +169,19 @@ agent = dict(
     clip_grad_norm=3.0,
     soft_update_tau=0.005,
     state_value_tau=0,
+    discretized_low=0,
+    discretized_high=10,
     device=None,
-    action_wrapper_method='softmax',
-    T=0.1)
+    action_wrapper_method='softmax')
+decoder_embed_dim = 64
+decoder_depth = 1
+act_lr = 2e-05
+cri_lr = 2e-05
+rep_lr = 1e-05
+beta_lr = 1e-05
+rep_loss_weight = 1.0
+beta_loss_weight = 0.01
+T = 0.1
 data_path = 'datasets/mcad/features'
 stocks_path = 'datasets/mcad/stocks.txt'
 aux_stocks_path = 'datasets/mcad/aux_stocks_files'

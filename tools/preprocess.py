@@ -247,7 +247,7 @@ def main(inpath, outpath):
 
         df = df.iloc[60:-1].reset_index()
         df = df[df["Date"] >= "2007-01-23"]
-        df = df[df["Date"] <= "2025-03-01"]
+        df = df[df["Date"] <= "2025-04-14"]
         df = df.reset_index(drop=True)
 
         # # nan value check

@@ -178,31 +178,31 @@ def main():
     2019-07-22 2021-01-08
     2021-01-08 2022-06-26
     [current]
-    train from: 2007-02-06
-    val from : 2019-09-25
-    test from: 2022-06-08
-    test end: 2025-02-28
+    train_start_date = "2007-02-06"
+    val_start_date = "2019-10-25"
+    test_start_date = "2022-07-19"
+    test_end_date = "2025-04-14"
     """
 
     if args.data_group == "0":
         train_start_date = "2007-02-06"
-        val_start_date = "2019-09-25"
-        test_start_date = "2022-06-08"
-        test_end_date = "2025-02-28"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1024
 
     elif args.data_group == "1":
         train_start_date = "2007-02-06"
-        val_start_date = "2019-09-25"
-        test_start_date = "2022-06-08"
-        test_end_date = "2025-02-28"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1280
 
     elif args.data_group == "2":
         train_start_date = "2007-02-06"
-        val_start_date = "2019-09-25"
-        test_start_date = "2022-06-08"
-        test_end_date = "2025-02-28"
+        val_start_date = "2019-10-25"
+        test_start_date = "2022-07-19"
+        test_end_date = "2025-04-14"
         n_steps_per_episode = 1536
     else:
         raise ValueError("data_group must be 0, 1, 2")

@@ -1,7 +1,7 @@
 python tools/make_scripts.py \
  --config configs/ddpg_portfolio_management.py \
  --action_wrapper_method softmax \
- --num_episodes 250 \
+ --num_episodes 100 \
  --dataset mcad \
  --num_stocks 7 \
  --buffer_size 10000 \
